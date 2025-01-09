@@ -1,0 +1,966 @@
+import pygame
+import sys
+import random
+import os 
+
+
+
+# Carregar imagens
+tela_ajuda = pygame.image.load("/Users/catarinadias/Desktop/trabalho_PATHUM/tela_ajuda.jpg")
+tela1 = pygame.image.load("/Users/catarinadias/Desktop/trabalho_PATHUM/tela1.jpg")
+tela2 = pygame.image.load("/Users/catarinadias/Desktop/trabalho_PATHUM/tela2.jpg")
+tela3 = pygame.image.load("/Users/catarinadias/Desktop/trabalho_PATHUM/tela3.jpg")
+music_file_path = "/Users/catarinadias/Desktop/trabalho_PATHUM/Subway-Surfers-Theme-Sound-Effect.mp3"
+pygame.init()
+pygame.mixer.init()
+
+# Carregar música
+pygame.mixer.music.load(music_file_path)
+pygame.mixer.music.play(-1)
+
+# Carregar fonte personalizada
+font_path = pygame.font.Font("/Users/catarinadias/Desktop/trabalho_PATHUM/PermanentMarker-Regular.ttf", 40)
+custom_font = pygame.font.Font("/Users/catarinadias/Desktop/trabalho_PATHUM/PermanentMarker-Regular.ttf",40)
+# Inicialização do Pygame
+
+
+
+# Configurações da tela
+SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+BG_COLOR = (0, 0, 0)
+BUTTON_COLOR = (235, 26, 235)
+TEXT_COLOR = (255, 255, 255)
+DARK_SQUARE_COLOR = (139, 69, 19)
+LIGHT_SQUARE_COLOR = (245, 222, 179)
+PIECE_RADIUS = 20
+WHITE = (255, 255, 255)
+BLACK = (0,0,0)
+PLAYER1 = WHITE
+PLAYER2 = BLACK
+BOARD_SIZE = 7
+SQUARE_SIZE = min(SCREEN_WIDTH, SCREEN_HEIGHT) // BOARD_SIZE
+WIDTH = HEIGHT = BOARD_SIZE * SQUARE_SIZE
+FPS = 30
+NUM_BLACK_HOLES = 5
+BLUE = (252,223,182)
+PINK = (128, 88, 33)
+
+# Carrega a música de fundo e toca
+pygame.mixer.music.play(-1)
+
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Pahtum")
+
+# Carrega a fonte
+font_button = pygame.font.Font(None, 40)
+pygame.font.init()
+# Estados do Jogo
+START_SCREEN = 'start_screen'
+CHOOSE_GAME_TYPE = 'choose_game_type'
+CHOOSE_DIFFICULTY = 'choose_difficulty'
+HELP = 'help'
+PLAY_GAME = 'play_game'
+
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Board Game")
+
+current_state = "start_screen"
+difficulty_level = None  # "easy", "medium", "hard"
+game_type = None  # "Player vs Computer", "Computer vs Computer"
+pathum_game = None
+class PathumGame:
+    def __init__(self):
+        self.board = [['' for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
+        self.current_turn = 'white'  # Branco começa
+        self.game_over = False
+        self.winner_player = None
+        self.move_log = []
+        self.add_black_holes(5)
+
+    def add_black_holes(self, num_black_holes):
+        added = 0
+        while added < num_black_holes:
+            x = random.randint(0, BOARD_SIZE - 1)
+            y = random.randint(0, BOARD_SIZE - 1)
+            if self.board[y][x] == '':
+                self.board[y][x] = 'BH'
+                added += 1
+
+    
+    def make_move(self, move):
+        x, y = move
+        if self.board[y][x] == '':
+            self.board[y][x] = self.current_turn
+            self.current_turn = 'black' if self.current_turn == 'white' else 'white'
+
+    def add_black_holes(self, num_black_holes):
+        added = 0
+        while added < num_black_holes:
+            x = random.randint(0, BOARD_SIZE -1)
+            y = random.randint(0, BOARD_SIZE -1)
+            if self.board[y][x] == '':
+                self.board[y][x] = 'BH'
+                added += 1
+
+    def is_game_over(self):
+        # Verifica se o tabuleiro está completamente preenchido
+        for row in self.board:
+            if '' in row:
+                return False
+        return True
+
+    def get_legal_moves(self):
+        # Retorna uma lista de movimentos legais
+        legal_moves = []
+        for y in range(BOARD_SIZE):
+            for x in range(BOARD_SIZE):
+                if self.board[y][x] == '':
+                    legal_moves.append((x, y))
+        return legal_moves
+
+    def make_move(self, move):
+        # Realiza um movimento válido
+        if move is not None:
+            x, y = move
+            if self.board[y][x] == '':
+                self.board[y][x] = self.current_turn
+                self.move_log.append(move)
+                self.current_turn = 'black' if self.current_turn == 'white' else 'white'
+            else:
+                self.undo_move
+    def undo_move(self):
+        if self.move_log:
+            last_move = self.move_log.pop()
+            x, y = last_move
+            self.board[y][x] = ''
+            self.current_turn = 'black' if self.current_turn == 'white' else 'white'
+
+    def winner(self):
+        if self.is_game_over():
+            points_white = self.calculate_points("White")
+            points_black = self.calculate_points("Black")
+            if points_white > points_black:
+                return "White"
+            elif points_white < points_black:
+                return "Black"
+            else:
+                return 'draw'
+        return None
+
+    def calculate_points(self, player):
+        # Calcula os pontos para o jogador fornecido
+        points = 0
+        for y in range(BOARD_SIZE):
+            for x in range(BOARD_SIZE):
+                if self.board[y][x] == player.lower():  # Assegure que a comparação de strings está correta
+                    line_points = self.points_for_line(x, y)
+                    points += line_points
+
+        return points
+
+    def points_for_line(self, x, y):
+        # Calcula os pontos para uma linha a partir de uma posição dada
+        points_table = {1: 0, 2: 0, 3: 3, 4: 10, 5: 25, 6: 56, 7: 119}
+        horizontal_count = 1
+        for i in range(1, BOARD_SIZE - x):
+            if self.board[y][x + i] == self.board[y][x]:
+                horizontal_count += 1
+            else:
+                break
+        for i in range(1, x + 1):
+            if x - i >= 0 and self.board[y][x - i] == self.board[y][x]:
+                horizontal_count += 1
+            else:
+                break
+    
+        vertical_count = 1
+        for i in range(1, BOARD_SIZE - y):
+            if self.board[y+i][x] == self.board[y][x]:
+                vertical_count += 1
+            else:
+                break
+        for i in range(1, y + 1):
+            if y - i >= 0 and self.board[y - i][x] == self.board[y][x]:
+                vertical_count += 1
+            else:
+                break
+        points = points_table.get(horizontal_count,0) + points_table.get(vertical_count,0)
+        return points
+
+def minimax(game, depth, alpha, beta, maximizing_player):
+    if depth == 0 or game.is_game_over():
+        return evaluate_board(game, game.current_turn), None
+
+    if maximizing_player:
+        max_eval = float('-inf')
+        best_move = None
+        for move in game.get_legal_moves():
+            game.make_move(move)
+            eval = minimax(game, depth - 1, alpha, beta, False)[0]
+            game.undo_move()
+            if eval > max_eval:
+                max_eval = eval
+                best_move = move
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break
+        return max_eval, best_move
+    else:
+        min_eval = float('inf')
+        best_move = None
+        for move in game.get_legal_moves():
+            game.make_move(move)
+            eval = minimax(game, depth - 1, alpha, beta, True)[0]
+            game.undo_move()
+            if eval < min_eval:
+                min_eval = eval
+                best_move = move
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break
+        return min_eval,best_move
+
+def simulate_random_playout(game):
+    current_state = game
+    while not current_state.is_game_over():
+        legal_moves = current_state.get_legal_moves()
+        weighted_moves = []
+        for move in legal_moves:
+            x, y = move
+            weight = 1
+            # Aumentar peso para movimentos no centro
+            if x == BOARD_SIZE // 2 or y == BOARD_SIZE // 2:
+                weight += 0.5
+            # Peso extra para bloquear oponente (simplificado)
+            if (x > 0 and game.board[y][x-1] != game.current_turn and game.board[y][x-1] != '') or \
+               (x < BOARD_SIZE - 1 and game.board[y][x+1] != game.current_turn and game.board[y][x+1] != ''):
+                weight += 0.3
+            weighted_moves.extend([move] * int(weight * 10))
+        move = random.choice(weighted_moves)
+        current_state.make_move(move)
+    return current_state.calculate_points(current_state.current_turn)
+
+def evaluate_board(game, player):
+    # Pontuação baseada nas regras oficiais do jogo
+    points = game.calculate_points(player)
+
+    # Heurísticas para adicionar à avaliação
+    center_bonus = 3  # Pontos extras para peças no centro
+    block_bonus = 2   # Pontos extras por bloqueio
+    victory_threshold = 100  # Limite de pontuação para considerar estar "próximo da vitória"
+
+    for y in range(BOARD_SIZE):
+        for x in range(BOARD_SIZE):
+            if game.board[y][x] == player:
+                line_points = game.points_for_line(x, y)
+                points += line_points
+                # Heurística de controle do centro
+                if x == BOARD_SIZE // 2 or y == BOARD_SIZE // 2:
+                    points += center_bonus
+                # Heurística de bloqueio (simplificada para exemplo)
+                if (x > 0 and game.board[y][x-1] != player and game.board[y][x-1] != '') or \
+                   (x < BOARD_SIZE - 1 and game.board[y][x+1] != player and game.board[y][x+1] != ''):
+                    points += block_bonus
+
+    # Heurística de Avaliação Dinâmica
+    if points >= victory_threshold:
+        points *= 1.1  # Aumentar a pontuação em 10% se estiver muito próximo da vitória
+
+    return points
+
+
+
+def monte_carlo(game, simulations):
+    best_move = None
+    best_score = float('-inf')
+
+    legal_moves = game.get_legal_moves()
+    for move in legal_moves:
+        total_score = 0
+        for _ in range(simulations):
+            cloned_game = clone_game(game)
+            cloned_game.make_move(move)
+            while not cloned_game.is_game_over():
+                cloned_game.make_move(random.choice(cloned_game.get_legal_moves()))
+            total_score += evaluate_board(cloned_game, cloned_game.current_turn)
+        average_score = total_score / simulations
+        if average_score > best_score:
+            best_score = average_score
+            best_move = move
+    return best_move
+
+def simulate_random_playout(game):
+    current_state = game
+    while not current_state.is_game_over():
+        legal_moves = current_state.get_legal_moves()
+        move = random.choice(legal_moves)
+        current_state.make_move(move)
+    score = current_state.calculate_points(current_state.current_turn)
+    return score
+
+def clone_game(game):
+    cloned_game = PathumGame()
+    cloned_game.board = [row[:] for row in game.board]  # Copiar o tabuleiro
+    cloned_game.current_turn = game.current_turn  # Manter o jogador atual
+    return cloned_game
+
+
+def create_board():
+    board = [[0 for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
+    # Add black holes randomly
+    for _ in range(NUM_BLACK_HOLES):
+        x, y = random.randint(0, BOARD_SIZE - 1), random.randint(0, BOARD_SIZE - 1)
+        while board[y][x] != 0:  # Ensure we don't overwrite existing black holes
+            x, y = random.randint(0, BOARD_SIZE - 1), random.randint(0, BOARD_SIZE - 1)
+        board[y][x] = -1  # Mark as black hole
+    return board
+
+
+class Game:
+    def __init__(self):
+        self.board = create_board()  # 0 for empty, 1 for white, 2 for black
+        self.current_player = 1  # Start with white
+        self.running = True
+
+    def draw_board(self):
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
+                if self.board[row][col] == -1:  # Draw black holes
+                    pygame.draw.rect(screen, BLACK, (col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
+                else:
+                    color = PINK if (row + col) % 2 == 0 else BLUE
+                    pygame.draw.rect(screen, color, (col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
+                    if self.board[row][col] == 1:
+                        pygame.draw.circle(screen, WHITE, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 2 - 10)
+                    elif self.board[row][col] == 2:
+                        pygame.draw.circle(screen, BLACK, (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 2 - 10)
+
+    def handle_click(self, pos):
+        col = pos[0] // SQUARE_SIZE
+        row = pos[1] // SQUARE_SIZE
+        if self.board[row][col] == 0:  # If the cell is empty
+            self.board[row][col] = self.current_player
+            self.current_player = 3 - self.current_player  # Switch player
+
+    def run(self):
+        clock = pygame.time.Clock()
+        while self.running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if self.current_player == 1:  # Vez do jogador humano
+                        self.handle_click(pygame.mouse.get_pos())
+
+            if self.current_player == 2:  # Vez do computador
+                move = escolher_movimento_computador(self)
+                if move:
+                    self.apply_move(move)
+                    self.current_player = 1  # Alternar para o jogador humano
+
+            screen.fill(BLACK)  # Limpa a tela
+            self.draw_board()  # Desenha o estado atual do tabuleiro
+            pygame.display.flip()  # Atualiza a tela
+            clock.tick(60)  # Mantém o jogo rodando a 60 FPS
+
+
+        pygame.quit()
+
+
+class Piece:
+    def __init__(self, color, row, col):
+        self.color = color
+        self.row = row
+        self.col = col
+
+    def draw(self, screen):
+        x = SQUARE_SIZE * self.col + SQUARE_SIZE // 2
+        y = SQUARE_SIZE * self.row + SQUARE_SIZE // 2
+        pygame.draw.circle(screen, self.color, (x, y), PIECE_RADIUS)
+
+class GameState:
+    def __init__(self):
+        self.game = PathumGame()
+        self.board = [[None for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
+        self.create_piece()
+        self.current_player = "white"
+        self.hint_button_rect = pygame.Rect(SCREEN_WIDTH - 110, 10, 100, 50)
+        self.suggested_move = None 
+
+    def draw_hint_button(self, screen):
+        # Definir as dimensões do botão
+        button_width = 100
+        button_height = 50
+
+        # Calcular a posição x e y para colocar o botão no canto inferior direito
+        x_position = SCREEN_WIDTH - self.hint_button_rect.width - 10  # 10 pixels de margem da borda direita
+        y_position = 10  # 10 pixels de margem do topo da tela
+
+        # Atualizar a posição do retângulo do botão
+        self.hint_button_rect = pygame.Rect(x_position, y_position, button_width, button_height)
+
+        # Desenhar o botão
+        pygame.draw.rect(screen, (242, 66, 245), self.hint_button_rect)  # Cor verde para o botão
+        font = pygame.font.Font(None, 36)
+        text = font.render("Hint", True, (0,0,0))  # Texto branco
+        text_rect = text.get_rect(center=(x_position + button_width // 2, y_position + button_height // 2))
+        screen.blit(text, text_rect)
+
+
+    def create_piece(self):
+        pass
+
+
+    def create_board(self,screen):
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
+                if (row + col) % 2 == 0:
+                    self.board[row][col] = 'black'
+                    
+
+    def get_legal_moves(self):
+        legal_moves = []
+        for y in range(BOARD_SIZE):
+            for x in range(BOARD_SIZE):
+                if self.board[y][x] == 'white':  
+                    if y > 0 and x > 0 and self.board[y-1][x-1] == None:
+                        legal_moves.append(((x, y), (x-1, y-1)))  
+                    if y > 0 and x < BOARD_SIZE - 1 and self.board[y-1][x+1] == None:
+                        legal_moves.append(((x, y), (x+1, y-1))) 
+        return legal_moves
+
+    # Desenha o tabuleiro de jogo
+    def draw_board(self, screen):    
+        screen.fill(BG_COLOR)  # Limpa a tela com a cor de fundo
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
+                x = col * SQUARE_SIZE
+                y = row * SQUARE_SIZE
+                color = DARK_SQUARE_COLOR if (row + col) % 2 == 0 else LIGHT_SQUARE_COLOR
+                pygame.draw.rect(screen, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
+
+                if self.suggested_move and (col, row) == self.suggested_move:
+                    pygame.draw.circle(screen, (255, 0, 0), (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2), 10)  # Destaca a sugestão
+                
+                elif self.game.board[row][col] == 'BH':
+                    # Desenhar um quadrado preto para os buracos negros
+                    pygame.draw.rect(screen, BLACK, (x, y, SQUARE_SIZE, SQUARE_SIZE))
+                else:
+                    # Define a cor com base no padrão de tabuleiro quadriculado
+                    color = DARK_SQUARE_COLOR if (row + col) % 2 == 0 else LIGHT_SQUARE_COLOR
+                    pygame.draw.rect(screen, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
+
+                    # Continua a desenhar as peças brancas e pretas
+                    if self.game.board[row][col] == 'white':
+                        pygame.draw.circle(screen, WHITE, (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2), SQUARE_SIZE // 2 - 10)
+                    elif self.game.board[row][col] == 'black':
+                        pygame.draw.circle(screen, BLACK, (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2), SQUARE_SIZE // 2 - 10)
+
+    def highlight_suggested_move(self, move):
+        if move:
+            self.suggested_move = move  # Guarda o movimento sugerido
+        else:
+            self.suggested_move = None  # Limpa a sugestão anterior se não houver movimento
+    
+    
+    def handle_click(self, pos):
+        col = pos[0] // SQUARE_SIZE
+        row = pos[1] // SQUARE_SIZE
+        if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE:  # Verifica limites
+            if (col, row) == self.suggested_move or self.game.board[row][col] == '':  # Checa se a célula está vazia ou é a sugerida
+                self.game.board[row][col] = self.current_player
+                self.current_player = 'black' if self.current_player == 'white' else 'white'  # Troca de jogador
+                self.suggested_move = None  # Limpa a sugestão após o movimento
+                return True  # Retorna verdadeiro se um movimento foi feito
+        return False  
+
+    
+def draw_text(text, position, font=font_path, color=TEXT_COLOR):
+    text_surface = font.render(text, True, color)
+    rect = text_surface.get_rect(center=position)
+    screen.blit(text_surface, rect)
+
+# Desenha a tela inicial
+def draw_start_screen():
+    screen.fill(BG_COLOR)
+    image = pygame.image.load("/Users/catarinadias/Desktop/trabalho_PATHUM/tela1.jpg")
+    image = pygame.transform.scale(image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen.blit(image,(0,0))
+    title_text = font_path.render("Pahtum", True, TEXT_COLOR)
+    screen.blit(title_text, (SCREEN_WIDTH / 2 - title_text.get_width() / 2, 150))
+    
+    # Desenhar o botão "Play"
+    play_button = pygame.Rect(SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT / 2, 200, 50)
+    pygame.draw.rect(screen, BUTTON_COLOR, play_button)
+    text = font_button.render("Play", True, BG_COLOR)
+    screen.blit(text, (play_button.x + (play_button.width - text.get_width()) / 2, play_button.y + (play_button.height - text.get_height()) / 2))
+
+def draw_board(self, screen):
+        screen.fill(BG_COLOR)  # Preenche o fundo com a cor do tabuleiro
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
+                color = DARK_SQUARE_COLOR if (row + col) % 2 == 0 else LIGHT_SQUARE_COLOR
+                rect = pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
+                pygame.draw.rect(screen, color, rect)
+                piece = self.board[row][col]
+                if piece:
+                    piece.draw(screen)
+# Desenha a tela de seleção do tipo de jogo
+
+def draw_choose_game_type_screen():
+    screen.fill(BG_COLOR)
+    
+    # Carregar e redimensionar a imagem de fundo
+    background_image = tela2
+    background_image = pygame.transform.scale(background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    
+    # Desenhar a imagem de fundo
+    screen.blit(background_image, (0, 0))
+    
+    global buttons_game_type
+    buttons_game_type = []
+    button_width = 380  # Largura dos botões
+    button_height = 55  # Altura dos botões
+    vertical_spacing = 30  # Espaçamento vertical entre os botões
+
+    options_colors = {
+        "Computer Vs Computer": (80, 244, 250),   # Verde
+        "Computer Vs User": (80, 244, 250), # Amarelo
+        "User1 Vs User2": (80, 244, 250)  # Vermelho
+    }
+    
+    options = ["Computer Vs Computer", "Computer Vs User", "User1 Vs User2"]
+    for i, option in enumerate(options):
+        # Calcular a posição do retângulo
+        button_x = (SCREEN_WIDTH - button_width) // 2
+        button_y = 150 + i * (button_height + vertical_spacing)
+        
+        color = options_colors[option]
+        # Criar retângulo e adicionar à lista de botões
+        button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        pygame.draw.rect(screen, color, button_rect)
+        buttons_game_type.append((button_rect, option))
+        
+        # Desenhar o retângulo
+        pygame.draw.rect(screen, BUTTON_COLOR, button_rect, 4)
+        
+        # Desenhar o texto do botão
+        text = font_button.render(option, True, (0,0,0))
+        text_rect = text.get_rect(center=button_rect.center)
+        screen.blit(text, text_rect)
+        
+    help_button = pygame.Rect(SCREEN_WIDTH - 150, SCREEN_HEIGHT - 100, 100, 50)
+    pygame.draw.rect(screen, BUTTON_COLOR, help_button)
+    text = font_button.render("?", True, BG_COLOR)
+    screen.blit(text, (help_button.x + (help_button.width - text.get_width()) / 2, help_button.y + (help_button.height - text.get_height()) / 2))
+
+
+# Desenha a tela de ajuda
+help_screen_background = tela_ajuda
+
+# Função de desenho da tela de ajuda
+def draw_help_screen():
+    # Carrega a imagem de fundo
+    background_image = tela_ajuda
+    # Redimensiona a imagem para o tamanho da tela
+    background_image = pygame.transform.scale(background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    
+    # Obtém o retângulo da imagem de fundo
+    background_rect = background_image.get_rect()
+    # Define a posição central da imagem de fundo
+    background_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+    
+    # Desenha a imagem de fundo na tela no centro
+    screen.blit(background_image, background_rect)
+
+
+
+def draw_difficulty_screen(difficulty_options):
+    screen.fill(BG_COLOR)
+    image = tela3
+    image = pygame.transform.scale(image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen.blit(image, (0, 0))
+
+    # Defina as dimensões dos retângulos e o espaçamento entre eles
+    button_width = 200
+    button_height = 50
+    vertical_spacing = 20
+
+    global difficulties
+    buttons_difficulty = []
+    for i, (difficulty, color) in enumerate(difficulty_options):
+        # Calcule a posição do retângulo
+        button_x = (SCREEN_WIDTH - button_width) // 2
+        button_y = 150 + i * (button_height + vertical_spacing)
+
+        button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        pygame.draw.rect(screen, color, button_rect)
+
+        buttons_difficulty.append((button_rect, difficulty))
+
+    for button_rect, difficulty in buttons_difficulty:
+        # Desenhe o contorno do retângulo
+        pygame.draw.rect(screen, (80, 244, 250), button_rect, 4)
+
+        # Desenhe o texto do modo de dificuldade no centro do retângulo
+        text = font_button.render(difficulty, True, (0,0,0))
+        text_rect = text.get_rect(center=button_rect.center)
+        screen.blit(text, text_rect)
+
+    return buttons_difficulty
+
+def draw_CHOOSE_DIFFICULTY_screen(selected_game_type):
+
+    screen.fill(BG_COLOR)
+    image = pygame.image.load("/Users/catarinadias/Desktop/trabalho_PATHUM/tela3.jpg")
+    image = pygame.transform.scale(image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen.blit(image, (0, 0))
+    
+    # Defina as dimensões dos retângulos e o espaçamento entre eles
+    button_width = 200
+    button_height = 50
+    vertical_spacing = 20
+    
+    difficulty_colors = {
+        "EASY": (244, 184, 245),   # Verde
+        "MEDIUM": (248, 132, 250), # Amarelo
+        "HARD": (242, 66, 245)  # Vermelho
+    }
+    
+    global difficulties
+    difficulties = ["EASY", "MEDIUM", "HARD"]
+    buttons_difficulty = []
+    for i, difficulty in enumerate(difficulties):
+        # Calcule a posição do retângulo
+        button_x = (SCREEN_WIDTH - button_width) // 2
+        button_y = 150 + i * (button_height + vertical_spacing)
+        
+        color = difficulty_colors[difficulty]
+
+        button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        pygame.draw.rect(screen, color, button_rect)
+        
+        buttons_difficulty.append((button_rect, difficulty))
+    
+    for button_rect, difficulty in buttons_difficulty:
+        # Desenhe o contorno do retângulo
+        pygame.draw.rect(screen, (80, 244, 250), button_rect, 4)
+        
+        # Desenhe o texto do modo de dificuldade no centro do retângulo
+        text = font_button.render(difficulty, True, (0,0,0))
+        text_rect = text.get_rect(center=button_rect.center)
+        screen.blit(text, text_rect)
+    return buttons_difficulty
+
+def draw_CHOOSE_COMP_screen(selected_game_type):
+    screen.fill(BG_COLOR)
+    image = tela3
+    image = pygame.transform.scale(image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen.blit(image, (0, 0))
+    button_width = 390
+    button_height = 50
+    vertical_spacing = 20
+    
+    difficulty_colors = {
+        "Expert vs Beginner": (244, 184, 245),
+        "Expert vs Average": (248, 132, 250),  # Corrected typo from "Experts" to "Expert"
+        "Average vs Beginner": (242, 66, 245)
+    }
+    
+    difficulties = ["Expert vs Beginner", "Expert vs Average", "Average vs Beginner"]
+    buttons_difficulty = []
+    for i, difficulty in enumerate(difficulties):
+        button_x = (SCREEN_WIDTH - button_width) // 2
+        button_y = 150 + i * (button_height + vertical_spacing)
+        
+        color = difficulty_colors[difficulty]
+        button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        pygame.draw.rect(screen, color, button_rect)
+        
+        buttons_difficulty.append((button_rect, difficulty))
+    
+    for button_rect, difficulty in buttons_difficulty:
+        pygame.draw.rect(screen, (80, 244, 250), button_rect, 4)
+        
+        text = font_button.render(difficulty, True, (0,0,0))
+        text_rect = text.get_rect(center=button_rect.center)
+        screen.blit(text, text_rect)
+    return buttons_difficulty
+
+    
+def escolher_movimento_computador(game_state_obj, selected_game_type):
+    game = game_state_obj.game
+
+    if selected_game_type == "Expert vs Beginner":
+        if game.current_turn == 'white':
+            move = monte_carlo(game, simulations=10)
+        else:
+            move = minimax(game, depth=3, alpha=float('-inf'), beta=float('inf'), maximizing_player=True)[1]
+    elif selected_game_type == "Expert vs Average":
+        if game.current_turn == 'white':
+            move = monte_carlo(game, simulations=10)
+        else:
+            move = minimax(game, depth=3, alpha=float('-inf'), beta=float('inf'), maximizing_player=True)[1]
+    elif selected_game_type == "Average vs Beginner":
+        if game.current_turn == 'white':
+            move = minimax(game, depth=3, alpha=float('-inf'), beta=float('inf'), maximizing_player=True)[1]
+        else:
+            move = random.choice(game.get_legal_moves())
+
+    return move
+
+def handle_click(self, pos):
+    col = pos[0] // SQUARE_SIZE
+    row = pos[1] // SQUARE_SIZE
+    if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE:  # Verifica limites
+        if self.game.board[row][col] == '' or (col, row) == self.suggested_move:  # Checa se a célula está vazia ou é a sugerida
+            self.game.board[row][col] = self.current_player
+            self.current_player = 'black' if self.current_player == 'white' else 'white'  # Troca de jogador
+            self.suggested_move = None  # Limpa a sugestão após o movimento
+            return True  # Retorna verdadeiro se um movimento foi feito
+    return False  
+
+    
+
+def is_computers_turn(current_player, selected_game_type):
+    # Assume que `current_player` alterna entre 'human' e 'computer'
+    # Para um jogo entre computador e usuário, ou entre dois computadores
+    if selected_game_type == "Computer Vs User":
+        # Se o jogo é entre um computador e um usuário, verifica se é a vez do computador
+        return current_player == "computer"
+    elif selected_game_type == "Computer Vs Computer":
+        # Se o jogo é entre dois computadores, então é sempre a vez de um computador
+        return True
+    elif selected_game_type == "User1 Vs User2":
+        # Se o jogo é entre dois usuários, nunca é a vez do computador
+        return False
+
+def play_computer_vs_computer():
+    game = PathumGame()
+    while not game.is_game_over():
+        if game.current_turn == 'white':
+            move = monte_carlo(game, 100)  # Montecarlo para as peças brancas
+        else:
+            move = minimax(game, 3, float('-inf'), float('inf'), True)[1]  # Minimax para as peças pretas
+        game.make_move(move)
+
+def play_average_vs_beginner():
+    game = PathumGame()
+    while not game.is_game_over():
+        if game.current_turn == 'white':
+            move = minimax(game, 3, float('-inf'), float('inf'), True)[1]  # Minimax para as peças brancas
+        else:
+            move = random.choice(game.get_legal_moves())  # Aleatório para as peças pretas
+        game.make_move(move)
+
+def get_best_move_monte_carlo(game):
+    return monte_carlo(game, 100)
+
+def get_best_move_minimax(game):
+    return minimax(game, 3, float('-inf'), float('inf'), True)[1]
+
+def draw_score_screen(winner, score_white, score_black):
+    screen.fill(BG_COLOR)  # Limpa a tela
+    winner_text = f"Winner: {winner}" if winner != 'draw' else "The game is a draw"
+    winner_surface = font_path.render(winner_text, True, TEXT_COLOR)
+    winner_rect = winner_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
+
+    score_text = f"White: {score_white} | Black: {score_black}"
+    score_surface = font_path.render(score_text, True, TEXT_COLOR)
+    score_rect = score_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+
+    screen.blit(winner_surface, winner_rect)
+    screen.blit(score_surface, score_rect)
+    pygame.display.flip()
+    pygame.time.wait(15000)  # Mostra a tela de pontuação por 5 segundos antes de fechar ou reiniciar
+
+def handle_difficulty_selection(pos):
+
+    global game_state, game_state_obj
+    selected_game_type = ""
+    buttons_difficulty = draw_CHOOSE_DIFFICULTY_screen(selected_game_type)  
+    for button_rect, difficulty in buttons_difficulty:
+        if button_rect.collidepoint(pos):
+            game_state = PLAY_GAME
+            game_state_obj = GameState()  # Recria o estado do jogo, presumindo que você tem uma função de reinicialização adequada aqui
+            return True
+    return False
+
+def monte_carlo_suggestion(game_state_obj, simulations=1):
+    # Obtém o estado atual do jogo
+    game = game_state_obj.game
+
+    # Chama a função monte_carlo para obter a sugestão de movimento
+    suggested_move = monte_carlo(game, simulations)
+
+    return suggested_move
+
+
+def main():
+    global game_state, game_state_obj, running, selected_game_type, buttons_difficulty  # Controle global do estado do jogo
+    game_state = START_SCREEN  # Estado inicial do jogo
+    game_state_obj = GameState()  # Gerenciamento do estado do tabuleiro
+    running = True
+    selected_game_type = ""  # Tipo de jogo selecionado
+    WAITING_FOR_DIFFICULTY_SELECTION = "WAITING_FOR_DIFFICULTY_SELECTION"
+    WAITING_FOR_COMP_SELECTION="WAITING_FOR_COMP_SELECTION"
+    buttons_difficulty =[]
+    play_button = pygame.Rect(SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT / 2, 200, 50)
+    clock = pygame.time.Clock()
+    difficulty_options = [("EASY", (244, 184, 245)), ("MEDIUM", (248, 132, 250)), ("HARD", (242,66,245))]
+    help_button = pygame.Rect(SCREEN_WIDTH - 150, SCREEN_HEIGHT - 100, 100, 50)
+    previous_state = None
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                pos = pygame.mouse.get_pos()
+
+                if help_button.collidepoint(pos):
+                    previous_state = game_state
+                    game_state = HELP 
+                if game_state == CHOOSE_GAME_TYPE:
+                    for button_rect, game_type in buttons_game_type:
+                        if button_rect.collidepoint(pos):
+                            selected_game_type = game_type
+                            if game_type == "Computer Vs Computer":
+                                game_state = WAITING_FOR_COMP_SELECTION
+                                break
+                            elif game_type == "Computer Vs User":
+                                draw_CHOOSE_DIFFICULTY_screen(selected_game_type)
+                                game_state = WAITING_FOR_DIFFICULTY_SELECTION
+                            elif game_type == "User1 Vs User2":
+                                game_state = PLAY_GAME
+                                game_state_obg = GameState()
+                elif game_state == CHOOSE_DIFFICULTY:
+                    if handle_difficulty_selection(pos):
+                        continue
+                elif game_state == WAITING_FOR_COMP_SELECTION:
+                        for button_rect, config_option in buttons_difficulty:
+                            if button_rect.collidepoint(pos):
+                                game_state = PLAY_GAME
+                                game_state_obj = GameState()  # Reinicia ou configura um novo jogo
+                                game_state_obj.initialize_game(selected_game_type)  # Garanta que esta função configure tudo necessário
+                                break
+
+                elif game_state == WAITING_FOR_DIFFICULTY_SELECTION:
+                    for button_rect, difficulty in buttons_difficulty:
+                        if button_rect.collidepoint(pos):
+                            difficulty_level = difficulty
+                            game_state = PLAY_GAME
+                elif game_state == PLAY_GAME:
+                    if selected_game_type == "User1 Vs User2":
+                        pos = pygame.mouse.get_pos()
+                        if game_state_obj.handle_click(pos):  # Processa o clique e verifica se foi um movimento válido
+                            game_state_obj.draw_board(screen) 
+                            if game_state_obj.game.is_game_over():
+                                winner = game_state_obj.game.winner()  # Supondo que este método retorna 'white', 'black' ou 'draw'
+                                score_white = game_state_obj.game.calculate_points("White")
+                                score_black = game_state_obj.game.calculate_points("Black")
+                                draw_score_screen(winner, score_white, score_black)
+                                game_state = START_SCREEN  
+                    elif selected_game_type in ["Expert vs Beginner", "Expert vs Average", "Average vs Beginner"]:
+                        if is_computers_turn():
+                            move = escolher_movimento_computador(game_state_obj, selected_game_type)
+                            game_state_obj.game.make_move(move)
+                        elif event.type == pygame.MOUSEBUTTONDOWN:
+                            game_state_obj.handle_click(pos)
+                        game_state_obj.draw_board(screen)  # Certifique-se que isso aconteça a cada ciclo de jogo
+                    
+                    elif selected_game_type == "Computer Vs User":
+                        # Desenha o botão "Dicas"
+                        game_state_obj.draw_hint_button(screen)
+                        
+                        if event.type == pygame.MOUSEBUTTONDOWN:
+                            pos = pygame.mouse.get_pos()
+                            # Verifica se o clique foi no botão "Dicas"
+                            if game_state_obj.hint_button_rect.collidepoint(pos):
+                                # Use a função de Monte Carlo para sugerir uma posição
+                                suggested_move = monte_carlo_suggestion(game_state_obj)
+                                # Faça algo com a posição sugerida, como destacá-la na tela
+                                game_state_obj.highlight_suggested_move(suggested_move)
+                                # Atualize o tabuleiro na tela
+                                game_state_obj.draw_board(screen)
+                            elif game_state == START_SCREEN:
+                                draw_start_screen()
+                    if game_state_obj.game.is_game_over():
+                        winner = game_state_obj.game.winner()  # Supondo que este método retorna 'white', 'black' ou 'draw'
+                        score_white = game_state_obj.game.calculate_points("white")
+                        score_black = game_state_obj.game.calculate_points("black")
+                        draw_score_screen(winner, score_white, score_black)
+                        pygame.time.wait(15000)  # Espera 5 segundos mostrando a tela de pontuação
+                        game_state = START_SCREEN  # Ou pode reiniciar o jogo ou voltar ao menu principal
+
+                    if game_state_obj.hint_button_rect.collidepoint(pos) and not help_button.collidepoint(pos):
+                        # Chama a função de Monte Carlo para sugerir uma posição
+                        if not game_state_obj.suggested_move:
+                            suggested_move = monte_carlo_suggestion(game_state_obj)
+                            game_state_obj.highlight_suggested_move(suggested_move)
+                        game_state_obj.draw_board(screen)
+
+                    elif game_state_obj.handle_click(pos):
+                        # Se o clique foi na posição sugerida, coloca a peça e limpa a sugestão
+                        game_state_obj.suggested_move = None
+                        game_state_obj.draw_board(screen)
+                        if game_state_obj.game.is_game_over():
+                            # Handle game over logic
+                            pass
+
+                if help_button.collidepoint(pos) and game_state != PLAY_GAME:
+                    game_state = HELP
+
+
+                elif game_state == START_SCREEN:
+                    draw_start_screen()
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            running = False
+                        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            pos = pygame.mouse.get_pos()
+                            if play_button.collidepoint(pos):
+                                game_state = CHOOSE_GAME_TYPE
+                pygame.draw.rect(screen, BUTTON_COLOR, help_button)
+                text = font_button.render("?", True, TEXT_COLOR)
+                screen.blit(text, (help_button.x + (help_button.width - text.get_width()) // 2, 
+                                help_button.y + (help_button.height - text.get_height()) // 2))
+          
+                if game_state == PLAY_GAME and selected_game_type == "User1 Vs User2":
+                    if game_state_obj.hint_button_rect.collidepoint(pos):
+                        # Chama a função monte_carlo_suggestion e trata o resultado
+                        suggested_move = monte_carlo_suggestion(game_state_obj, simulations=1)
+                        # Aqui você pode decidir o que fazer com o suggested_move,
+                        # por exemplo, mostrar na tela ou aplicar o movimento sugerido.
+         
+            
+              # Lógica para desenhar tela com base no estado atual
+        if game_state == START_SCREEN:
+            draw_start_screen()
+        elif game_state == CHOOSE_GAME_TYPE:
+            draw_choose_game_type_screen()
+        elif game_state == HELP:
+            draw_help_screen()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    game_state = previous_state 
+        elif game_state == WAITING_FOR_COMP_SELECTION:
+            draw_CHOOSE_COMP_screen(selected_game_type)
+        elif game_state == WAITING_FOR_DIFFICULTY_SELECTION:
+            draw_CHOOSE_DIFFICULTY_screen(selected_game_type)
+        elif game_state == PLAY_GAME:
+            game_state_obj.draw_board(screen)
+            if selected_game_type == "User1 Vs User2":
+                # Desenha apenas o botão de dicas no modo User vs User
+                game_state_obj.draw_hint_button(screen)
+        pygame.display.flip()
+        clock.tick(60)  # Limitar taxa de quadros a 60 FPS
+
+    pygame.quit()
+    sys.exit()
+
+
+if __name__ == "__main__":
+    main()
